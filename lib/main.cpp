@@ -46,8 +46,6 @@ for( int j = 0; j < 10000; ++j )
 f.print_backend();
 free( kbuf );
 
-cout<<"There are "<<f.get_unsynced_byte_count()<<" unsyced bytes"<<endl;
-
 f.print_backend();
 
 //f.do_write( kbuf, 0, sizeof( kbuf ) );
