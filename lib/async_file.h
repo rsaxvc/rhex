@@ -4,6 +4,7 @@
 #include <pthread.h>
 
 #include <list>
+#include <iostream>
 
 #include <sys/stat.h>
 
@@ -39,6 +40,8 @@ struct async_file_stats
 	size_t unsynced_blocks;
 	size_t blocks;
 	};
+
+std::ostream& operator<<(std::ostream & stream, const async_file_stats & stats );
 
 class async_file
 {
