@@ -13,13 +13,11 @@
 
 using namespace std;
 
-//print a char in bold
+//to print a char in bold
 //addch( 'f'|A_BOLD );
 
 void draw_screen( async_file & fd )
 {
-int x;
-int y;
 int ix;
 int iy;
 size_t size;
@@ -27,16 +25,17 @@ size_t max_size;
 
 size_t iterator;
 
-bin2hex b;
+//int x = getmaxx( stdscr );
+int x = ( 2 + getmaxx( stdscr ) ) / 3; // divide by 3 for <hexchar><hexchar><space>
+int y = getmaxy( stdscr ) - 2;//minus 2 for analysis lines
 
-x = getmaxx( stdscr );
-y = getmaxy( stdscr );
+bin2hex b;
 
 size = fd.get_size();
 max_size = size;
-if( max_size > x * y /2 )
+if( max_size > x * y )
 	{
-	max_size = x * y / 2;
+	max_size = x * y;
 	}
 
 char * buf = (char*)malloc( max_size );
@@ -49,14 +48,14 @@ if( max_size != fd.do_read( buf, 0x00, max_size ) )
 
 if( y > 3 )
 	{
-	for( iy = 0; iy < y - 2; ++iy )
+	for( iy = 0; iy < y - 2; ++iy ) // -2 for analysis lines
 		{
-		for( ix = 0; ix < x; ix+=3 )
+		for( ix = 0; ix < x; ix++ )
 			{
-			move( iy, ix );
-			if( iy * x + ix/2 <= max_size )
+			move( iy, ix * 3 );
+			if( iy * x + ix < max_size )
 				{
-				printw("%s", b(buf[iy*x + ix/2 ]) );
+				printw("%s", b(buf[iy*x + ix ]) );
 				}
 			else
 				{
@@ -69,6 +68,7 @@ if( y > 3 )
 free( buf );
 }
 
+//use libmagic to generate an analysis of what the bytes @ offset mean
 void draw_byte_analysis( async_file & fd, size_t offset, int x, int y, int w )
 {
 magic_t m;
@@ -135,7 +135,7 @@ while( running )
 	draw_byte_analysis( fd, 0x00,   0, getmaxy( stdscr ) - 2, getmaxx( stdscr ) );
 	draw_byte_analysis( fd, cursor, 0, getmaxy( stdscr ) - 1, getmaxx( stdscr ) );
 
-	move( cursor / ( getmaxx( stdscr ) / 3 ), 3 * ( cursor % ( getmaxx( stdscr ) / 3 ) ) );
+	move( cursor / ( ( 2 + getmaxx( stdscr ) ) / 3 ), 3 * ( cursor % ( ( 2 + getmaxx( stdscr ) ) / 3 ) ) );
 	refresh();
 
 	key = getch();
@@ -143,10 +143,10 @@ while( running )
 	switch( key )
 		{
 		case KEY_UP:
-			if( cursor > getmaxx( stdscr ) / 3 )
+			if( cursor > (2 + getmaxx( stdscr ) ) / 3 )
 				{
 				//move cursor one UI-line
-				cursor-= getmaxx( stdscr ) / 3;
+				cursor-= (2 + getmaxx( stdscr ) ) / 3;
 				}
 			else
 				{
@@ -170,14 +170,14 @@ while( running )
 			break;
 
 		case KEY_DOWN:
-			if( cursor + getmaxx( stdscr ) / 3 < fd.get_stats().fstats.st_size )
+			if( cursor + ( 2 + getmaxx( stdscr ) ) / 3 < fd.get_stats().fstats.st_size )
 				{
 				//move cursor one UI-line
-				cursor+= getmaxx( stdscr ) / 3;
+				cursor+= ( 2 + getmaxx( stdscr ) ) / 3;
 				}
 			else
 				{
-				//heading past end of file
+				//heading past end of file, clip it
 				cursor = fd.get_stats().fstats.st_size;
 				if( cursor > 0 )
 					{
