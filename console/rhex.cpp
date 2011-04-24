@@ -25,6 +25,8 @@ int iy;
 size_t size;
 size_t max_size;
 
+size_t iterator;
+
 bin2hex b;
 
 x = getmaxx( stdscr );
@@ -49,9 +51,9 @@ if( y > 3 )
 	{
 	for( iy = 0; iy < y - 2; ++iy )
 		{
-		for( ix = 0; ix * 2 < x; ix+=2 )
+		for( ix = 0; ix < x; ix+=3 )
 			{
-			move( iy, ix * 2 );
+			move( iy, ix );
 			if( iy * x + ix/2 <= max_size )
 				{
 				printw("%s", b(buf[iy*x + ix/2 ]) );
@@ -103,6 +105,8 @@ bool running = true;
 int x=0;
 int y=0;
 int key;
+size_t cursor=0; //position of cursor in file
+size_t filesize=0;
 
 if( numArgs != 2 )
 	{
@@ -128,11 +132,10 @@ while( running )
 	//printw("Hello World !!!");
 
 	draw_screen( fd );
-	size_t pos = y * ( getmaxx( stdscr ) / 3 ) + ( x / 3 );
-	draw_byte_analysis( fd, 0x00, 0, getmaxy( stdscr ) - 2, getmaxx( stdscr ) );
-	draw_byte_analysis( fd, pos,  0, getmaxy( stdscr ) - 1, getmaxx( stdscr ) );
+	draw_byte_analysis( fd, 0x00,   0, getmaxy( stdscr ) - 2, getmaxx( stdscr ) );
+	draw_byte_analysis( fd, cursor, 0, getmaxy( stdscr ) - 1, getmaxx( stdscr ) );
 
-	move( y, x );
+	move( cursor / ( getmaxx( stdscr ) / 3 ), 3 * ( cursor % ( getmaxx( stdscr ) / 3 ) ) );
 	refresh();
 
 	key = getch();
@@ -140,46 +143,47 @@ while( running )
 	switch( key )
 		{
 		case KEY_UP:
-			if( y > 0 )
+			if( cursor > getmaxx( stdscr ) / 3 )
 				{
-				y--;
+				//move cursor one UI-line
+				cursor-= getmaxx( stdscr ) / 3;
+				}
+			else
+				{
+				//heading past start of file
+				cursor = 0;
 				}
 			break;
 
 		case KEY_LEFT:
-			if( x > 0 || y > 0 )
+			if( cursor > 0 )
 				{
-				if( x > 0 )
-					{
-					x--;
-					}
-				else
-					{
-					y--;
-					x = x + getmaxx( stdscr ) - 1;
-					}
+				cursor--;
 				}
 			break;
 
 		case KEY_RIGHT:
-			if( x + 1 < getmaxx( stdscr ) || y + 1 < getmaxy( stdscr ) )
+			if( cursor + 1 < fd.get_stats().fstats.st_size )
 				{
-				if( x + 1 < getmaxx( stdscr ) )
-					{
-					x++;
-					}
-				else
-					{
-					y++;
-					x = x + 1 - getmaxx( stdscr );
-					}
+				cursor++;
 				}
 			break;
 
 		case KEY_DOWN:
-			if( y + 1 < getmaxy( stdscr ) )
+			if( cursor + getmaxx( stdscr ) / 3 < fd.get_stats().fstats.st_size )
 				{
-				y++;
+				//move cursor one UI-line
+				cursor+= getmaxx( stdscr ) / 3;
+				}
+			else
+				{
+				//heading past end of file
+				cursor = fd.get_stats().fstats.st_size;
+				if( cursor > 0 )
+					{
+					cursor--;
+					}
+				//else - if file is 0 bytes long, keep cursor at zero.
 				}
 			break;
 
