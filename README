@@ -1,2 +1,53 @@
-make the library
-then make the console app
+Instructions:
+	make the library
+	make the console app(rhex)
+	write the gui app, then
+		make the gui app
+
+Parts:
+	lib - asyncronous i/o library
+	console - ncurses editor
+	gui - some sort of gui client, not attempted yet
+	test - some files to hexedit
+
+Notes on lib - 
+	async_file.cpp implements a list(or possibly later tree or hash ) of data sources.
+	The async_file.cpp api consists of functions like do_action( location in file, # bytes, ptr ).
+	async_file.cpp implements write-buffering. Theoretically, it should be possible to write 1 byte
+	to a multi-git file.
+
+	Notes on types of data sources - currently 2/5 implemented:
+		1)memory mapped source - Implemented
+			These are created with standard calls to mmap().
+			When a read() is issued, these can be accessed directly.
+			However, since they keep the area mmap()ed the whole
+			time the source exists, they eat a lot of virtual 
+			address space. When a write is issued to a mmap()ed
+			source, a memory-backed source is created to buffer
+			the write, and the mmap()ed source is either shrunk
+			or split into two depending of the location of the
+			write.
+
+		2)memory backed source - Implemented
+			These are created with standard calls to malloc().
+			These are only created on a write call. These
+			represent 'dirty' parts of the file. However, 
+			if bytes are inserted in the middle of the file,
+			everything after that is dirty too.	
+
+		3)memory mapped dynamic source - Not Implemented
+			Same as #1, but only mmap()s the memory just
+			before a read. Needed for Large File Support
+			on 32-bit computers
+
+		4)file backed source - Not Implemented
+			Same purpose as #1, but only uses calls to seek
+			and read. Needed for filesystems that don't 
+			support mmap().
+
+		5)client-generated memory backed source - Not Implemented
+			Same as #2, but does not call malloc - passed in
+			pointer is now property of async_file, and will
+			be managed / freed thusly. This is useful to
+			remove an extra malloc/memcpy/free when the UI
+			isn't going to use the memory anymore
