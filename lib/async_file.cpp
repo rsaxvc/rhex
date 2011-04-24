@@ -189,7 +189,7 @@ pthread_join( thread, NULL );
 assert( objects.size() == 1 || objects.size() == 0 );
 if( objects.size() == 1 )
 	{
-	assert( (objects.front())->type == BLOCK_TYPE_MEM );
+	assert( (objects.front())->type != BLOCK_TYPE_MEM );
 	}
 }
 
