@@ -1,0 +1,20 @@
+byte mode:
+<16hexdigits><1column sep><<2 digits for byte + sep>^x><1 column sep><1digit per byte>
+nchnks = (screen width - 18)/4
+nbytes = (screen width - 18)/4
+
+short mode:
+<16hexdigits><1column sep><<4 digits for short + sep>^x><1 column sep><2 digit per short >
+nchnks = (screen width - 18)/7
+nbytes = (screen width - 18)/3.5
+
+32 bit mode 
+<16hexdigits><1column sep><<8 digits for short + sep>^x><1 column sep><4 digit per short >
+nchnks = (screen width - 18)/13
+nbytes = (screen width - 18)/3.25
+
+64 bit mode
+<16hexdigits><1column sep><<16 digits for short + sep>^x><1 column sep><8 digit per short >
+nchnks = (screen width - 18)/25
+nbytes = (screen width - 18)/3.125
+	
