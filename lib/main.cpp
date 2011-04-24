@@ -29,16 +29,13 @@ memset( kbuf, 0x00, f.get_size() );
 
 f.print_backend();
 
-f.do_write( kbuf, 1, 5 );
-f.do_write( kbuf, 1, 5 );
-
 int count;
 for( int j = 0; j < 10000; ++j )
 	{
 	cout<<endl;
 	cout<<"j="<<j<<endl;
 	int where = rand() % f.get_size();
-	int how_much = rand() % ( f.get_size() - where ) / 2;
+	int how_much = rand() % ( f.get_size() - where ) / 3;
 	cout<<"Writing "<<how_much<<" bytes to "<<where<<endl;
 	count = f.do_write(	kbuf, where, how_much );
 	assert( count == how_much );
@@ -48,6 +45,7 @@ free( kbuf );
 
 f.print_backend();
 
+cout<<f.get_stats()<<endl;
 //f.do_write( kbuf, 0, sizeof( kbuf ) );
 f.do_close();
 

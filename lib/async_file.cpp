@@ -445,3 +445,12 @@ pthread_mutex_unlock( &lock );
 return retn;
 }
 
+
+std::ostream& operator<<(std::ostream & stream, const async_file_stats & s )
+{
+stream<<"\tThere are "<<s.blocks<<" blocks"<<endl;
+stream<<"\tThere are "<<s.unsynced_blocks<<" unsynced blocks"<<endl;
+stream<<"\tThere are "<<s.fstats.st_size<<" total bytes in the file"<<endl;
+stream<<"\tThere are "<<s.unsynced_size<<" bytes buffered in memory"<<endl;
+}
+
