@@ -188,6 +188,8 @@ while( running )
 			break;
 
 		case KEY_EXIT:
+		case 'q':
+		case 'Q':
 			running = false;
 			break;
 		}
