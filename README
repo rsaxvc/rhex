@@ -16,7 +16,7 @@ Notes on lib -
 	async_file.cpp implements write-buffering. Theoretically, it should be possible to write 1 byte
 	to a multi-git file.
 
-	Notes on types of data sources - currently 2/5 implemented:
+	Notes on types of data sources - currently 3/5 implemented:
 		1)memory mapped source - Implemented
 			These are created with standard calls to mmap().
 			When a read() is issued, these can be accessed directly.
@@ -45,9 +45,10 @@ Notes on lib -
 			and read. Needed for filesystems that don't 
 			support mmap().
 
-		5)client-generated memory backed source - Not Implemented
+		5)client-generated memory backed source - Implemented
 			Same as #2, but does not call malloc - passed in
 			pointer is now property of async_file, and will
 			be managed / freed thusly. This is useful to
 			remove an extra malloc/memcpy/free when the UI
-			isn't going to use the memory anymore
+			isn't going to use the memory anymore. Currently
+			not exposed outside of async_file library.

@@ -22,13 +22,22 @@ using std::endl;
 	#define max( _lhs, _rhs ) ( ( _lhs < _rhs )? ( _rhs ) : ( _lhs ) )
 #endif
 
-block::block( void * buf, size_t byte_count )
+block::block( void * buf, size_t byte_count, bool manage_buffer )
 {
 //cout<<"Generating new MEM block of "<<byte_count<<"bytes"<<endl;
 type = BLOCK_TYPE_MEM;
-ptr = malloc( byte_count );
+if( manage_buffer )
+	{
+	//caller asked us to manage the buffer
+	ptr = buf;
+	}
+else
+	{
+	//caller asked us to not manage the buffer - make a copy instead
+	ptr = malloc( byte_count );
+	memcpy( ptr, buf, byte_count );
+	}
 size = byte_count;
-memcpy( ptr, buf, byte_count );
 offset = 0;
 }
 
@@ -70,6 +79,7 @@ size = 0;
 void * async_thread( void * ptr )
 {
 async_file * file = (async_file*)ptr;
+std::list<block*>::iterator i;
 
 pthread_mutex_lock( &file->lock );
 while( file->running )
@@ -301,7 +311,7 @@ else
 			{
             //Need to split block into mmap, mem, mmap, no need to continue
             objects.insert( i, new block( fd, (*i)->offset, offset - seek ) );
-            objects.insert( i, new block( data, length ) );
+            objects.insert( i, new block( data, length, false ) );
             objects.insert( i, new block( fd, (*i)->offset + ( offset - seek ), (*i)->size - ( offset - seek ) - length ) );
 			delete( *i );
 			objects.erase( i );
@@ -310,7 +320,7 @@ else
 			{
             //Need to split block into mmap, mem, may need to continue
             objects.insert( i, new block( fd, (*i)->offset, offset - seek ) );
-            objects.insert( i, new block( data, bytes_for_this_block ) );
+            objects.insert( i, new block( data, bytes_for_this_block, false ) );
 			delete( *i );
 			objects.erase( i );
 
@@ -326,16 +336,16 @@ else
 			}
 		else if( (*i)->size > length ) //new object is smaller than current block
 			{
-            //Need to split block into mem, mmap, no need to continue
-            objects.insert( i, new block( data, bytes_for_this_block ) );
-            objects.insert( i, new block( fd, (*i)->offset + ( offset - seek ), (*i)->size - ( offset - seek ) - length ) );
+			//Need to split block into mem, mmap, no need to continue
+			objects.insert( i, new block( data, bytes_for_this_block, false ) );
+			objects.insert( i, new block( fd, (*i)->offset + ( offset - seek ), (*i)->size - ( offset - seek ) - length ) );
 			delete( *i );
 			objects.erase( i );
 			}
 		else
 			{
 			//Need to replace whole block, and possibly keep going
-			objects.insert( i, new block( data, bytes_for_this_block ) );
+			objects.insert( i, new block( data, bytes_for_this_block, false ) );
 			delete( *i );
 			objects.erase( i );
 

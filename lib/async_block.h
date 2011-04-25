@@ -23,7 +23,7 @@ private:
 	size_t offset; //used to record where in a file this object points
 public:
 	block( int fd, size_t offset, size_t size );
-	block( void * buf, size_t size );
+	block( void * buf, size_t size, bool manage_buffer );
 	~block();
 };
 
