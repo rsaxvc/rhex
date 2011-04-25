@@ -2,6 +2,7 @@
 #define ASYNC_STATS_H
 
 #include <iostream>
+#include <sys/stat.h>
 
 struct async_file_stats
 	{

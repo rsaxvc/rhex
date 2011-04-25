@@ -1,4 +1,6 @@
 #include "async_file.h"
+#include "async_thread.h"
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <cassert>
@@ -21,85 +23,6 @@ using std::endl;
 #ifndef max
 	#define max( _lhs, _rhs ) ( ( _lhs < _rhs )? ( _rhs ) : ( _lhs ) )
 #endif
-
-block::block( void * buf, size_t byte_count, bool manage_buffer )
-{
-//cout<<"Generating new MEM block of "<<byte_count<<"bytes"<<endl;
-type = BLOCK_TYPE_MEM;
-if( manage_buffer )
-	{
-	//caller asked us to manage the buffer
-	ptr = buf;
-	}
-else
-	{
-	//caller asked us to not manage the buffer - make a copy instead
-	ptr = malloc( byte_count );
-	memcpy( ptr, buf, byte_count );
-	}
-size = byte_count;
-offset = 0;
-}
-
-block::block( int fd, size_t temp_offset, size_t byte_count )
-{
-//cout<<"Generating new MMAP block of "<<byte_count<<"bytes"<<endl;
-type = BLOCK_TYPE_MMAP;
-ptr = mmap( 0, byte_count, PROT_READ, MAP_SHARED, fd, temp_offset);
-size = byte_count;
-offset = temp_offset;
-if( ptr == NULL )
-	{
-	assert( false );
-	}
-}
-
-block::~block()
-{
-if( type == BLOCK_TYPE_MMAP )
-	{
-	//cout<<"Destroying MMAP block of "<<size<<" bytes"<<endl;
-	munmap( ptr, size );
-	size = 0;
-	}
-else if( type == BLOCK_TYPE_MEM )
-	{
-	//cout<<"Destroying MEM  block of "<<size<<" bytes"<<endl;
-	std::free( ptr );
-	ptr = NULL;
-	}
-else
-	{
-	assert( false );
-	}
-ptr = NULL;
-size = 0;
-}
-
-void * async_thread( void * ptr )
-{
-async_file * file = (async_file*)ptr;
-std::list<block*>::iterator i;
-
-pthread_mutex_lock( &file->lock );
-while( file->running )
-	{
-	pthread_mutex_unlock( &file->lock );
-	usleep(10000); //up to 100fps latency
-//	sleep(1); //extra latency for testing
-//	pthread_yield();
-//	std::cout<<"tick"<<std::endl;
-	pthread_mutex_lock( &file->lock );
-
-	if( file->autoflush )
-		{
-		}
-	//Do Work
-	}
-
-pthread_mutex_unlock( &file->lock );
-pthread_exit( NULL );
-}
 
 async_file::async_file()
 {
@@ -454,13 +377,3 @@ for( i = objects.begin(); i!= objects.end(); ++i )
 pthread_mutex_unlock( &lock );
 return retn;
 }
-
-
-std::ostream& operator<<(std::ostream & stream, const async_file_stats & s )
-{
-stream<<"\tThere are "<<s.blocks<<" blocks"<<endl;
-stream<<"\tThere are "<<s.unsynced_blocks<<" unsynced blocks"<<endl;
-stream<<"\tThere are "<<s.fstats.st_size<<" total bytes in the file"<<endl;
-stream<<"\tThere are "<<s.unsynced_size<<" bytes buffered in memory"<<endl;
-}
-
