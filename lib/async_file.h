@@ -67,4 +67,5 @@ private:
 	bool check_sanity();
 };
 
+
 #endif //ASYNC_FILE_H
