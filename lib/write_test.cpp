@@ -12,6 +12,8 @@ int main(int numArgs, char * args[] )
 async_file f;
 int i;
 
+srand(4);
+
 if( numArgs < 2 )
 	{
 	cout<<"Usage: "<<args[0]<<" <filename> "<<endl;
@@ -51,6 +53,8 @@ if( f.get_size() > 0 )
 		cout<<"Writing "<<how_much<<" bytes to "<<where<<endl;
 		count = f.do_write(	kbuf, where, how_much );
 		assert( count == how_much );
+
+		//sleep(1);
 		}
 	}
 else
