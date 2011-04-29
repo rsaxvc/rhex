@@ -13,16 +13,10 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
+#include "minmax.h"
+
 using std::cout;
 using std::endl;
-
-#ifndef min
-	#define min( _lhs, _rhs ) ( ( _lhs > _rhs )? ( _rhs ) : ( _lhs ) )
-#endif
-
-#ifndef max
-	#define max( _lhs, _rhs ) ( ( _lhs < _rhs )? ( _rhs ) : ( _lhs ) )
-#endif
 
 async_file::async_file()
 {
@@ -200,6 +194,9 @@ if( length <= 0 )
 
 pthread_mutex_lock( &lock );
 
+print_backend();
+do_checks();
+
 i = find_block( seek );
 
 //write starts past end of file, or write ends outside of file
@@ -227,21 +224,25 @@ else
 			{
 			out_count += do_write( data, offset, length );
 			}
+		do_checks();
 		}
 	else if( (*i)->type == BLOCK_TYPE_MMAP )
 		{
 		if( offset - seek && length < (*i)->size - ( offset - seek ) )
 			{
             //Need to split block into mmap, mem, mmap, no need to continue
+			assert( (*i)->size == length + offset - seek + (*i)->size - ( offset - seek ) - length );
             objects.insert( i, new block( fd, (*i)->offset, offset - seek ) );
             objects.insert( i, new block( data, length, false ) );
             objects.insert( i, new block( fd, (*i)->offset + ( offset - seek ), (*i)->size - ( offset - seek ) - length ) );
 			delete( *i );
 			objects.erase( i );
+			do_checks();
 			}
 		else if( offset - seek ) //new object does not start on alignment of current block
 			{
             //Need to split block into mmap, mem, may need to continue
+			assert( (*i)->size == bytes_for_this_block + offset - seek );
             objects.insert( i, new block( fd, (*i)->offset, offset - seek ) );
             objects.insert( i, new block( data, bytes_for_this_block, false ) );
 			delete( *i );
@@ -256,18 +257,22 @@ else
 				{
 				out_count += do_write( data, offset, length );
 				}
+			do_checks();
 			}
 		else if( (*i)->size > length ) //new object is smaller than current block
 			{
 			//Need to split block into mem, mmap, no need to continue
+			assert( (*i)->size == bytes_for_this_block + (*i)->size - ( offset - seek ) - length );
 			objects.insert( i, new block( data, bytes_for_this_block, false ) );
 			objects.insert( i, new block( fd, (*i)->offset + ( offset - seek ), (*i)->size - ( offset - seek ) - length ) );
 			delete( *i );
 			objects.erase( i );
+			do_checks();
 			}
 		else
 			{
 			//Need to replace whole block, and possibly keep going
+			assert( bytes_for_this_block == (*i)->size );
 			objects.insert( i, new block( data, bytes_for_this_block, false ) );
 			delete( *i );
 			objects.erase( i );
@@ -281,6 +286,7 @@ else
 				{
 				out_count += do_write( data, offset, length );
 				}
+			do_checks();
 			}
 		}
 	else
@@ -289,6 +295,7 @@ else
 		}
 	}
 
+do_checks();
 pthread_mutex_unlock( &lock );
 return out_count;
 }
@@ -322,6 +329,11 @@ for( i = objects.begin(); i!= objects.end(); ++i )
 std::cout<<"\t"<<filesize<<"\tend of file"<<endl;
 if( filesize != fstats.st_size )
 	{
+	if( filesize != fstats.st_size )
+		{
+		cout<<"Filesize:"<<filesize<<endl;
+		cout<<"stats.sz:"<<fstats.st_size<<endl;
+		}
 	assert( filesize == fstats.st_size );
 	}
 pthread_mutex_unlock( &lock );
@@ -376,4 +388,43 @@ for( i = objects.begin(); i!= objects.end(); ++i )
 	}
 pthread_mutex_unlock( &lock );
 return retn;
+}
+
+size_t async_file::count_preceding_bytes(std::list<block*>::const_iterator search )
+{
+std::list<block*>::const_iterator i;
+size_t retn;
+
+retn = 0;
+
+pthread_mutex_lock( &lock );
+for( i = objects.begin(); i!= objects.end(); ++i )
+	{
+	if( search != i )
+		{
+		retn += (*i)->size;
+		}
+	else
+		{
+		break;
+		}
+	}
+pthread_mutex_unlock( &lock );
+assert( i == search );
+return retn;
+}
+
+void async_file::do_checks()
+{
+std::list<block*>::const_iterator i;
+size_t cnt;
+
+pthread_mutex_lock( &lock );
+cnt = 0;
+for( i = objects.begin(); i!= objects.end(); ++i )
+	{
+	cnt += (*i)->size;
+	}
+assert( fstats.st_size == cnt );
+pthread_mutex_unlock( &lock );
 }

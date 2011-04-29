@@ -50,7 +50,6 @@ for( int j = 0; j < f.get_size(); ++j )
 f.print_backend();
 
 cout<<f.get_stats()<<endl;
-//f.do_write( kbuf, 0, sizeof( kbuf ) );
 f.do_close();
 
 }

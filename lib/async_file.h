@@ -63,8 +63,16 @@ private:
 	int flags;   //Underlying file descriptor flags
 	struct stat fstats; //Underlying file stats, updated on write (not sure if by client or thread yet
 
-	std::list<block*>::iterator find_block( size_t & offset );
 	bool check_sanity();
+
+	std::list<block*>::iterator find_block( size_t & offset );
+	size_t count_preceding_bytes( std::list<block*>::const_iterator );
+	void do_checks();
+
+	//async_thread.c stuff
+	std::list<block*>::iterator find_first_unsynced_block();
+	void purge_dependencies( size_t offset, size_t length );
+
 };
 
 

@@ -15,6 +15,7 @@ enum block_type
 class block
 {
 friend class async_file;
+friend void * async_thread( void * );
 private:
 	block_type type;
 	void * ptr; //can be ptr to mem or ptr to mmap
