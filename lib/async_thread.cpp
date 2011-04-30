@@ -38,6 +38,8 @@ for( i = objects.begin(); i!= objects.end(); ++i )
 
 	offset += (*i)->size;
 	}
+//An end iterator signals the block wasn't found
+return i;
 }
 
 //purge all dependencies on a region of the backing store by
