@@ -27,6 +27,7 @@ if( !f.do_open( args[1], O_RDWR | O_CREAT ) )
 	}
 
 f.print_backend();
+f.set_autoflush( true );
 
 cout
 	<<"fstat:"<<f.get_status()

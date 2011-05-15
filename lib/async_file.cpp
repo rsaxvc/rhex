@@ -27,6 +27,8 @@ pthread_mutexattr_settype( &attr, PTHREAD_MUTEX_RECURSIVE );
 pthread_mutex_init( &lock, &attr );
 pthread_mutexattr_destroy( &attr );
 fd = -1;
+running = false;
+autoflush = false;
 }
 
 async_file::~async_file()
