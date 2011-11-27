@@ -33,6 +33,10 @@ autoflush = false;
 
 async_file::~async_file()
 {
+if( fd != -1 )
+	{
+	do_close();
+	}
 //sync with io thread
 pthread_mutex_lock( &lock );
 pthread_mutex_unlock( &lock );
@@ -119,6 +123,12 @@ assert( objects.size() == 1 || objects.size() == 0 );
 if( objects.size() == 1 )
 	{
 	assert( (objects.front())->type != BLOCK_TYPE_MEM );
+	}
+
+for( size_t i = objects.size(); i > 0; --i )
+	{
+	delete objects.back();
+	objects.pop_back();
 	}
 }
 
