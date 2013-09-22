@@ -7,10 +7,9 @@
 #include <fcntl.h>
 
 using namespace std;
-int main(int numArgs, char * args[] )
+int main(int numArgs, const char * const args[] )
 {{
 async_file f;
-int i;
 
 srand(4);
 
@@ -20,7 +19,7 @@ if( numArgs < 2 )
 	exit(1);
 	}
 
-if( !f.do_open( args[1], O_RDWR | O_CREAT ) )
+if( !f.do_open( args[1], O_RDWR | O_CREAT, S_IRUSR|S_IWUSR ) )
 	{
 	cout<<"Error opening "<<args[1]<<endl;
 	exit(2);
@@ -34,8 +33,6 @@ cout
 	<<"\nfsize:"<<f.get_size()
 	<<endl;
 
-i=0;
-
 void * kbuf;
 kbuf = malloc( f.get_size() );
 memset( kbuf, 0x00, f.get_size() );
@@ -45,6 +42,10 @@ f.print_backend();
 int count;
 if( f.get_size() > 0 )
 	{
+	f.do_write( kbuf, 0, 10 );
+	f.do_write( kbuf, 10, 11 );
+	f.do_write( kbuf, 30, 12 );
+
 	for( int j = 0; j < 10000; ++j )
 		{
 		cout<<endl;

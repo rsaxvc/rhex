@@ -3,15 +3,14 @@
 #include <cassert>
 #include <sys/mman.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #include "minmax.h"
 
 #include <iostream>
 using namespace std;
 
-#define nap() usleep(10000) //up to 100fps latency
-//	#define sleep(1); //extra latency for testing
-//	#define pthread_yield();
+#define nap() sleep(1)
 
 #define MAX_CHUNK_SIZE 65536
 
@@ -63,7 +62,7 @@ do
 			{
 			if( ( (*i)->offset + (*i)->size ) > offset && (*i)->offset < ( offset + length ) )
 				{
-				cout<<"Purging deps on block:offset:"<<(*i)->offset<<" and size:"<<(*i)->size<<endl;
+				cout<<"Purging deps on block with offset:"<<(*i)->offset<<" and size:"<<(*i)->size<<endl;
 				buf_start = (*i)->offset > offset ? (*i)->offset : offset;
 				buf_end   = (*i)->offset + (*i)->size < offset + length ? ( *i)->offset + (*i)->size : offset + length;
 
@@ -116,7 +115,6 @@ while( file->running )
 		i = file->find_first_unsynced_block();
 		if( i != file->objects.end() )
 			{
-			//Do Work
 			write_size = min( (*i)->size, MAX_CHUNK_SIZE );
 			file->print_backend();
 			cout<<"I->size:"<<(*i)->size<<endl;

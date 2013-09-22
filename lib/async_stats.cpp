@@ -7,5 +7,6 @@ stream<<"\tThere are "<<s.blocks<<" blocks"<<std::endl;
 stream<<"\tThere are "<<s.unsynced_blocks<<" unsynced blocks"<<std::endl;
 stream<<"\tThere are "<<s.fstats.st_size<<" total bytes in the file"<<std::endl;
 stream<<"\tThere are "<<s.unsynced_size<<" bytes buffered in memory"<<std::endl;
+return stream;
 }
 

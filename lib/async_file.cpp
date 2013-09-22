@@ -47,17 +47,16 @@ size_t async_file::do_read( void * data, size_t offset, size_t length )
 {
 std::list<block*>::const_iterator i;
 size_t retn; //counts bytes copied
-size_t seek; //records read position in file
+size_t block_offset; //records read position in file
 size_t length_remaining; //bytes remaining to be transferred
 
 retn = 0;
 length_remaining = length;
-seek = offset; //init seek posn to offset
 
 pthread_mutex_lock( &lock );
 
 //Find the first block in range
-i = find_block( seek );
+i = find_block( offset, block_offset );
 
 if( i == objects.end() )
 	{
@@ -68,7 +67,7 @@ if( i == objects.end() )
 for( ; i!= objects.end() && length_remaining; ++i )
 	{
 	//Find the spot and other math
-	size_t position_in_block = offset - seek;
+	size_t position_in_block = offset - block_offset;
 	size_t bytes_in_block = min( (*i)->size - position_in_block, length_remaining );
 
 //	std::cout<<"Entered block"<<std::endl;
@@ -83,7 +82,7 @@ for( ; i!= objects.end() && length_remaining; ++i )
 	//update bookkeeping
 	retn += bytes_in_block;
 	length_remaining -= bytes_in_block;
-	seek += (*i)->size;
+	block_offset += (*i)->size;
 	}
 
 pthread_mutex_unlock( &lock );
@@ -130,11 +129,15 @@ for( size_t i = objects.size(); i > 0; --i )
 	delete objects.back();
 	objects.pop_back();
 	}
+
+close(fd);
+
+fd = -1;
 }
 
-bool async_file::do_open( const char * filename, int file_flags )
+bool async_file::do_open( const char * filename, int file_flags, int mode )
 {
-fd = open( filename, file_flags );
+fd = open( filename, file_flags, mode );
 
 if( fd != -1 )
 	{
@@ -175,7 +178,7 @@ assert( running );
 while( objects.size() > 1 )
 	{
 	pthread_mutex_unlock( &lock );
-	pthread_yield();
+	sleep(1);
 	pthread_mutex_lock( &lock );
 	}
 pthread_mutex_unlock( &lock );
@@ -194,121 +197,83 @@ size_t async_file::do_write( void * data, size_t offset, size_t length )
 {
 size_t out_count;
 size_t bytes_for_this_block;
-size_t seek = offset;
+size_t block_offset;
 std::list<block*>::iterator i;
 
 bytes_for_this_block = 0;
+out_count = 0;
 
-if( length <= 0 )
+while( length )
 	{
-	return 0;
-	}
+	pthread_mutex_lock( &lock );
+	print_backend();
+	do_checks();
 
-pthread_mutex_lock( &lock );
+	i = find_block( offset, block_offset );
 
-print_backend();
-do_checks();
-
-i = find_block( seek );
-
-//write starts past end of file, or write ends outside of file
-if( i == objects.end() )
-	{
-	//need to expand file here
-	assert( false );
-	}
-else
-	{
-	bytes_for_this_block = min( length, (*i)->size - ( offset - seek ) );
-	if( bytes_for_this_block == 0 )
+	//write starts past end of file, or write ends outside of file
+	if( i == objects.end() )
 		{
-		assert(bytes_for_this_block != 0);
-		}
-	out_count = bytes_for_this_block;
-	if( (*i)->type == BLOCK_TYPE_MEM )
-		{
-		memcpy( (uint8_t*)((*i)->ptr) + ( offset - seek ), data, bytes_for_this_block );
-		seek += (*i)->size;
-		length -= bytes_for_this_block;
-		offset += bytes_for_this_block;
-		data = (uint8_t*)data + bytes_for_this_block;
-		if( length > 0 )
-			{
-			out_count += do_write( data, offset, length );
-			}
-		do_checks();
-		}
-	else if( (*i)->type == BLOCK_TYPE_MMAP )
-		{
-		if( offset - seek && length < (*i)->size - ( offset - seek ) )
-			{
-            //Need to split block into mmap, mem, mmap, no need to continue
-			assert( (*i)->size == length + offset - seek + (*i)->size - ( offset - seek ) - length );
-            objects.insert( i, new block( fd, (*i)->offset, offset - seek ) );
-            objects.insert( i, new block( data, length, false ) );
-            objects.insert( i, new block( fd, (*i)->offset + ( offset - seek ), (*i)->size - ( offset - seek ) - length ) );
-			delete( *i );
-			objects.erase( i );
-			do_checks();
-			}
-		else if( offset - seek ) //new object does not start on alignment of current block
-			{
-            //Need to split block into mmap, mem, may need to continue
-			assert( (*i)->size == bytes_for_this_block + offset - seek );
-            objects.insert( i, new block( fd, (*i)->offset, offset - seek ) );
-            objects.insert( i, new block( data, bytes_for_this_block, false ) );
-			delete( *i );
-			objects.erase( i );
-
-			//DoMeth
-			seek += (*i)->size;
-			length -= bytes_for_this_block;
-			offset += bytes_for_this_block;
-			data = (uint8_t*)data + bytes_for_this_block;
-			if( length > 0 )
-				{
-				out_count += do_write( data, offset, length );
-				}
-			do_checks();
-			}
-		else if( (*i)->size > length ) //new object is smaller than current block
-			{
-			//Need to split block into mem, mmap, no need to continue
-			assert( (*i)->size == bytes_for_this_block + (*i)->size - ( offset - seek ) - length );
-			objects.insert( i, new block( data, bytes_for_this_block, false ) );
-			objects.insert( i, new block( fd, (*i)->offset + ( offset - seek ), (*i)->size - ( offset - seek ) - length ) );
-			delete( *i );
-			objects.erase( i );
-			do_checks();
-			}
-		else
-			{
-			//Need to replace whole block, and possibly keep going
-			assert( bytes_for_this_block == (*i)->size );
-			objects.insert( i, new block( data, bytes_for_this_block, false ) );
-			delete( *i );
-			objects.erase( i );
-
-			//DoMath
-			seek += (*i)->size;
-			length -= bytes_for_this_block;
-			offset += bytes_for_this_block;
-			data = (uint8_t*)data + bytes_for_this_block;
-			if( length > 0 )
-				{
-				out_count += do_write( data, offset, length );
-				}
-			do_checks();
-			}
+		//need to expand file here
+		assert( false );
 		}
 	else
 		{
-		assert( false ); //bad block
+		bytes_for_this_block = min( length, (*i)->size - ( offset - block_offset ) );
+		assert( bytes_for_this_block != 0 );
+		if( (*i)->type == BLOCK_TYPE_MEM )
+			{
+			memcpy( (uint8_t*)((*i)->ptr) + ( offset - block_offset ), data, bytes_for_this_block );
+			}
+		else if( (*i)->type == BLOCK_TYPE_MMAP )
+			{
+			if( offset - block_offset && length < (*i)->size - ( offset - block_offset ) )
+				{
+	            //split block into mmap block + mem block + mmap block
+	            objects.insert( i, new block( fd, block_offset, offset - block_offset ) );
+	            objects.insert( i, new block( data, length, false ) );
+	            objects.insert( i, new block( fd, length + offset, (*i)->size - ( offset - block_offset ) - length ) );
+				delete( *i );
+				objects.erase( i );
+				}
+			else if( offset - block_offset ) //new object does not start on alignment of current block
+				{
+	            //split block into mmap block + mem block
+	            objects.insert( i, new block( fd, block_offset, offset - block_offset ) );
+	            objects.insert( i, new block( data, bytes_for_this_block, false ) );
+				delete( *i );
+				objects.erase( i );
+				}
+			else if( (*i)->size > length ) //new object is smaller than current block
+				{
+				//split block into mem block + mmap block
+				objects.insert( i, new block( data, bytes_for_this_block, false ) );
+				objects.insert( i, new block( fd, block_offset + bytes_for_this_block, (*i)->size - ( offset - block_offset ) - length ) );
+				delete( *i );
+				objects.erase( i );
+				}
+			else
+				{
+				//replace whole block
+				assert( bytes_for_this_block == (*i)->size );
+				objects.insert( i, new block( data, bytes_for_this_block, false ) );
+				delete( *i );
+				objects.erase( i );
+				}
+			}
+		else
+			{
+			assert( false ); //bad block
+			}
+		length -= bytes_for_this_block;
+		offset += bytes_for_this_block;
+		data = (uint8_t*)data + bytes_for_this_block;
+		out_count += bytes_for_this_block;
 		}
+	do_checks();
+	pthread_mutex_unlock( &lock );
 	}
 
-do_checks();
-pthread_mutex_unlock( &lock );
 return out_count;
 }
 
@@ -318,20 +283,20 @@ size_t filesize;
 
 std::list<block*>::const_iterator i;
 std::cout<<"Printing backend"<<std::endl;
-
+std::cout<<"\tRelOffset/LocOffset/Type/size"<<std::endl;
 filesize = 0;
 pthread_mutex_lock( &lock );
 for( i = objects.begin(); i!= objects.end(); ++i )
 	{
 	if( (*i)->type == BLOCK_TYPE_MEM )
 		{
+		std::cout<<"\t"<<filesize<<"\t"<<filesize<<"\tmem:"<<(*i)->size<<" bytes"<<std::endl;
 		filesize += (*i)->size;
-		std::cout<<"\t"<<filesize<<"\tMemory object:"<<(*i)->size<<" bytes"<<std::endl;
 		}
 	else if( (*i)->type == BLOCK_TYPE_MMAP )
 		{
+		std::cout<<"\t"<<filesize<<"\t"<<(*i)->offset<<"\tmmap:"<<(*i)->size<<" bytes"<<std::endl;
 		filesize += (*i)->size;
-		std::cout<<"\t"<<filesize<<"\tmmap   object:"<<(*i)->size<<" bytes"<<std::endl;
 		}
 	else
 		{
@@ -341,11 +306,8 @@ for( i = objects.begin(); i!= objects.end(); ++i )
 std::cout<<"\t"<<filesize<<"\tend of file"<<endl;
 if( filesize != fstats.st_size )
 	{
-	if( filesize != fstats.st_size )
-		{
-		cout<<"Filesize:"<<filesize<<endl;
-		cout<<"stats.sz:"<<fstats.st_size<<endl;
-		}
+	cout<<"Filesize:"<<filesize<<endl;
+	cout<<"stats.sz:"<<fstats.st_size<<endl;
 	assert( filesize == fstats.st_size );
 	}
 pthread_mutex_unlock( &lock );
@@ -353,22 +315,16 @@ std::cout<<"Done printing backend"<<std::endl;
 }
 
 //Return an iterator to first block that holds the offset, and update the offset of that block
-std::list<block*>::iterator async_file::find_block( size_t & offset )
+std::list<block*>::iterator async_file::find_block( size_t search_offset, size_t & block_offset )
 {
 std::list<block*>::iterator i;
-size_t seek; //records read position in file
 
-seek = 0;
+block_offset = 0;
 
 //Find the first block in range
-for( i = objects.begin(); i!= objects.end() && seek + (*i)->size <= offset; ++i )
+for( i = objects.begin(); i!= objects.end() && block_offset + (*i)->size <= search_offset; ++i )
 	{
-	seek += (*i)->size;
-	}
-
-if( i != objects.end() )
-	{
-	offset = seek;
+	block_offset += (*i)->size;
 	}
 
 return i;
@@ -435,6 +391,11 @@ pthread_mutex_lock( &lock );
 cnt = 0;
 for( i = objects.begin(); i!= objects.end(); ++i )
 	{
+	if( (*i)->type == BLOCK_TYPE_MMAP && (*i)->offset != cnt )
+		{
+		print_backend();
+		assert(false);
+		}
 	cnt += (*i)->size;
 	}
 assert( fstats.st_size == cnt );

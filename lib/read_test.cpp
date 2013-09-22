@@ -10,7 +10,6 @@ using namespace std;
 int main(int numArgs, char * args[] )
 {{
 async_file f;
-int i;
 
 if( numArgs < 2 )
 	{
@@ -18,7 +17,7 @@ if( numArgs < 2 )
 	exit(1);
 	}
 
-if( !f.do_open( args[1], O_RDWR | O_CREAT ) )
+if( !f.do_open( args[1], O_RDONLY, 0 ) )
 	{
 	cout<<"Error opening "<<args[1]<<endl;
 	exit(2);
@@ -31,20 +30,17 @@ cout
 	<<"\nfsize:"<<f.get_size()
 	<<endl;
 
-i=0;
-
 f.print_backend();
 
 for( int j = 0; j < f.get_size(); ++j )
 	{
 	char buf;
-	cout<<endl;
 	if( f.do_read( &buf, j, sizeof( buf ) ) != 1 )
 		{
 		cout<<"Error reading file at offset:"<<j<<endl;
 		exit(4);
 		}
-	cout<<j<<"="<<hex<<(unsigned int)buf<<endl;
+//	cout<<j<<"="<<hex<<(unsigned int)buf<<endl;
 	}
 
 f.print_backend();

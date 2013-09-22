@@ -27,7 +27,7 @@ public:
 	size_t get_size();
 
 	//control
-	bool do_open( const char * filename, int flags );
+	bool do_open( const char * filename, int flags, int mode );
 	void do_close();
 
 	//io
@@ -48,10 +48,6 @@ public:
 	//when off, changes won't be automatically written to disk
 	void set_autoflush( bool on );
 
-	//endian stuff, does not handle PDP-endian - not sure if this goes here or in UI
-	//void set_byte_reversal_length( size_t length );
-	//void set_byte_reversal_offset( size_t offset );
-
 private:
 	pthread_mutex_t   lock;
 	pthread_t         thread;
@@ -65,7 +61,7 @@ private:
 
 	bool check_sanity();
 
-	std::list<block*>::iterator find_block( size_t & offset );
+	std::list<block*>::iterator find_block( size_t search_offset, size_t & block_offset );
 	size_t count_preceding_bytes( std::list<block*>::const_iterator );
 	void do_checks();
 

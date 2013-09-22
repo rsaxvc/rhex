@@ -28,10 +28,7 @@ type = BLOCK_TYPE_MMAP;
 ptr = mmap( 0, byte_count, PROT_READ, MAP_SHARED, fd, temp_offset);
 size = byte_count;
 offset = temp_offset;
-if( ptr == NULL )
-	{
-	assert( false );
-	}
+assert( ptr != MAP_FAILED );
 }
 
 block::~block()
