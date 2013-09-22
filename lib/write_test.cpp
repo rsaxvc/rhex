@@ -26,7 +26,8 @@ if( !f.do_open( args[1], O_RDWR | O_CREAT, S_IRUSR|S_IWUSR ) )
 	}
 
 f.print_backend();
-f.set_autoflush( true );
+//f.set_autoflush( true );
+f.set_autoflush( false );
 
 cout
 	<<"fstat:"<<f.get_status()
@@ -43,8 +44,8 @@ int count;
 if( f.get_size() > 0 )
 	{
 	f.do_write( kbuf, 0, 10 );
-	f.do_write( kbuf, 10, 11 );
-	f.do_write( kbuf, 30, 12 );
+	f.do_write( kbuf, 4096, 11 );
+	f.do_write( kbuf, 1024*1024-12, 12 );
 
 	for( int j = 0; j < 10000; ++j )
 		{

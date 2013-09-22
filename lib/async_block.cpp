@@ -4,7 +4,7 @@
 
 #include <sys/mman.h>
 
-block::block( void * buf, size_t byte_count, bool manage_buffer )
+block::block( uint8_t * buf, size_t byte_count, bool manage_buffer )
 {
 type = BLOCK_TYPE_MEM;
 if( manage_buffer )
@@ -15,7 +15,7 @@ if( manage_buffer )
 else
 	{
 	//caller asked us to not manage the buffer - make a copy instead
-	ptr = malloc( byte_count );
+	ptr = (uint8_t*)malloc( byte_count );
 	memcpy( ptr, buf, byte_count );
 	}
 size = byte_count;
@@ -25,7 +25,7 @@ offset = 0;
 block::block( int fd, size_t temp_offset, size_t byte_count )
 {
 type = BLOCK_TYPE_MMAP;
-ptr = mmap( 0, byte_count, PROT_READ, MAP_SHARED, fd, temp_offset);
+ptr = (uint8_t*)mmap( 0, byte_count, PROT_READ, MAP_SHARED, fd, temp_offset);
 size = byte_count;
 offset = temp_offset;
 assert( ptr != MAP_FAILED );
@@ -35,12 +35,12 @@ block::~block()
 {
 if( type == BLOCK_TYPE_MMAP )
 	{
-	munmap( ptr, size );
+	munmap( (void*)ptr, size );
 	size = 0;
 	}
 else if( type == BLOCK_TYPE_MEM )
 	{
-	std::free( ptr );
+	std::free( (void*)ptr );
 	ptr = NULL;
 	}
 else

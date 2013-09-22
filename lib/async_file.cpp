@@ -29,6 +29,8 @@ pthread_mutexattr_destroy( &attr );
 fd = -1;
 running = false;
 autoflush = false;
+
+mmap_alignment = sysconf(_SC_PAGE_SIZE);
 }
 
 async_file::~async_file()
@@ -69,12 +71,6 @@ for( ; i!= objects.end() && length_remaining; ++i )
 	//Find the spot and other math
 	size_t position_in_block = offset - block_offset;
 	size_t bytes_in_block = min( (*i)->size - position_in_block, length_remaining );
-
-//	std::cout<<"Entered block"<<std::endl;
-//	std::cout<<"\tposition_in_block"<<position_in_block<<std::endl;
-//	std::cout<<"\tbytes_in_block:"<<bytes_in_block<<std::endl;
-//	std::cout<<"\tlength_remains:"<<length_remaining<<std::endl;
-//	std::cout<<"\tblock size"<<(*i)->size<<std::endl;
 
 	//do the transfer
 	memcpy( data, (uint8_t*)(*i)->ptr + position_in_block, bytes_in_block );
@@ -193,12 +189,14 @@ pthread_mutex_unlock( &lock );
 return retn;
 }
 
-size_t async_file::do_write( void * data, size_t offset, size_t length )
+size_t async_file::do_write( void * _data, size_t offset, size_t length )
 {
+size_t temp_sz;
 size_t out_count;
 size_t bytes_for_this_block;
 size_t block_offset;
 std::list<block*>::iterator i;
+uint8_t * data = (uint8_t*)_data;
 
 bytes_for_this_block = 0;
 out_count = 0;
@@ -220,6 +218,9 @@ while( length )
 	else
 		{
 		bytes_for_this_block = min( length, (*i)->size - ( offset - block_offset ) );
+		std::cout<<"bftb:"<<bytes_for_this_block<<std::endl;
+		std::cout<<"boff:"<<block_offset<<std::endl;
+		std::cout<<"woff:"<<offset<<std::endl;
 		assert( bytes_for_this_block != 0 );
 		if( (*i)->type == BLOCK_TYPE_MEM )
 			{
@@ -227,39 +228,61 @@ while( length )
 			}
 		else if( (*i)->type == BLOCK_TYPE_MMAP )
 			{
-			if( offset - block_offset && length < (*i)->size - ( offset - block_offset ) )
+			size_t consumed_length;
+
+			consumed_length = 0;
+
+			//if possible, replace some of current block with mmap'd block
+			temp_sz = (offset-block_offset)&~(mmap_alignment-1);
+			if( temp_sz )
 				{
-	            //split block into mmap block + mem block + mmap block
-	            objects.insert( i, new block( fd, block_offset, offset - block_offset ) );
-	            objects.insert( i, new block( data, length, false ) );
-	            objects.insert( i, new block( fd, length + offset, (*i)->size - ( offset - block_offset ) - length ) );
-				delete( *i );
-				objects.erase( i );
+				objects.insert( i, new block( fd, block_offset, temp_sz ) );
+				consumed_length += temp_sz;
 				}
-			else if( offset - block_offset ) //new object does not start on alignment of current block
+			assert( ( consumed_length & (mmap_alignment-1) ) == 0 );
+
+			//if needed, pad up to new block size
+			temp_sz = mmap_alignment - (consumed_length&(mmap_alignment-1));
+			if( temp_sz > 0 && temp_sz != mmap_alignment )
+				{//fixup alignment requirements
+				objects.insert( i, new block( (*i)->ptr + bytes_for_this_block, temp_sz, false ) );
+				consumed_length += temp_sz;
+				}
+			assert( ( consumed_length & (mmap_alignment-1) ) == 0 );
+
+			//install the new block
+			objects.insert( i, new block( data, bytes_for_this_block, false ) );
+			consumed_length += bytes_for_this_block;
+
+			//if needed, pad out to the next mmap page size
+			temp_sz = ( (*i)->size - consumed_length ) & (mmap_alignment - 1 );
+			if( temp_sz > 0 )
+				{//fixup alignment requirements
+				objects.insert( i, new block( (*i)->ptr + consumed_length, temp_sz, false ) );
+				consumed_length += temp_sz;
+				}
+			assert( ( consumed_length & (mmap_alignment-1) ) == 0 );
+
+			//if possible, pad out the remainder with an mmap'd block
+			temp_sz = ( (*i)->size - consumed_length ) & ~( mmap_alignment-1 );
+			if( temp_sz )
 				{
-	            //split block into mmap block + mem block
-	            objects.insert( i, new block( fd, block_offset, offset - block_offset ) );
-	            objects.insert( i, new block( data, bytes_for_this_block, false ) );
-				delete( *i );
-				objects.erase( i );
+				objects.insert( i, new block( fd, block_offset + consumed_length, temp_sz ) );
+				consumed_length += temp_sz;
 				}
-			else if( (*i)->size > length ) //new object is smaller than current block
+			assert( ( consumed_length & (mmap_alignment-1) ) == 0 );
+
+			//if needed, pad out the remainder with a mem block
+			temp_sz = ( (*i)->size - consumed_length );
+			if( temp_sz )
 				{
-				//split block into mem block + mmap block
-				objects.insert( i, new block( data, bytes_for_this_block, false ) );
-				objects.insert( i, new block( fd, block_offset + bytes_for_this_block, (*i)->size - ( offset - block_offset ) - length ) );
-				delete( *i );
-				objects.erase( i );
+				objects.insert( i, new block( (*i)->ptr + consumed_length, temp_sz, false ) );
 				}
-			else
-				{
-				//replace whole block
-				assert( bytes_for_this_block == (*i)->size );
-				objects.insert( i, new block( data, bytes_for_this_block, false ) );
-				delete( *i );
-				objects.erase( i );
-				}
+			assert( ( consumed_length & (mmap_alignment-1) ) == 0 );
+
+			assert( consumed_length == (*i)->size );
+			delete( *i );
+			objects.erase( i );
 			}
 		else
 			{
@@ -394,10 +417,15 @@ for( i = objects.begin(); i!= objects.end(); ++i )
 	if( (*i)->type == BLOCK_TYPE_MMAP && (*i)->offset != cnt )
 		{
 		print_backend();
+		std::cout<<"Bad offsets:"<<(*i)->offset<<" and "<<cnt<<std::endl;
 		assert(false);
 		}
 	cnt += (*i)->size;
 	}
-assert( fstats.st_size == cnt );
+if( fstats.st_size != cnt )
+	{
+	print_backend();
+	assert(false);
+	}
 pthread_mutex_unlock( &lock );
 }

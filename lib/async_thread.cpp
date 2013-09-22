@@ -10,7 +10,8 @@
 #include <iostream>
 using namespace std;
 
-#define nap() sleep(1)
+#define nap() pthread_yield()
+//#define nap() sleep(1)
 
 #define MAX_CHUNK_SIZE 65536
 
@@ -117,14 +118,10 @@ while( file->running )
 			{
 			write_size = min( (*i)->size, MAX_CHUNK_SIZE );
 			file->print_backend();
-			cout<<"I->size:"<<(*i)->size<<endl;
 			file->purge_dependencies( file->count_preceding_bytes(i), write_size );
-			cout<<"I->size:"<<(*i)->size<<endl;
 			i = file->find_first_unsynced_block();
-			cout<<"I->size:"<<(*i)->size<<endl;
 			if( write_size > (*i)->size )
 				{
-				cout<<"ws:"<<write_size<<endl<<"I->size"<<(*i)->size<<endl;
 				file->print_backend();
 				}
 			assert( write_size <= (*i)->size );
@@ -136,7 +133,6 @@ while( file->running )
 			written = file->do_read( write_ptr, (*i)->offset, write_size );
 			munmap( write_ptr, write_size );
 			assert( written == write_size );
-			cout<<"count5:"<<file->lock.__data.__count<<endl;
 
 			//Insert a new record for the freshly written bit
 			file->objects.insert( i, new block( file->fd, (*i)->offset, write_size ) );
@@ -147,7 +143,6 @@ while( file->running )
 				file->objects.insert( i, new block( (uint8_t*)((*i)->ptr) + write_size, (*i)->size - write_size, false ) );
 				}
 			delete( *i );
-			cout<<"count6:"<<file->lock.__data.__count<<endl;
 			}
 		}
 	}

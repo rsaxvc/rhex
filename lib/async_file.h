@@ -55,6 +55,7 @@ private:
 	int               fd;
 	bool              running;
 	bool              autoflush;
+	int               mmap_alignment;
 
 	int flags;   //Underlying file descriptor flags
 	struct stat fstats; //Underlying file stats, updated on write (not sure if by client or thread yet
